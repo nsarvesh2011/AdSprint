@@ -22,6 +22,8 @@ clicks visible Skip Ad controls.
 
 ## Verify behavior
 
+### Playback speed
+
 1. Open Chrome DevTools on a YouTube page.
 2. Select the **Console** tab.
 3. Filter the Console using `YT Ad Speedup`.
@@ -33,11 +35,23 @@ Expected logs include:
 [YT Ad Speedup] Initialized
 [YT Ad Speedup] Ad detected
 [YT Ad Speedup] Playback rate set to 4.5x
-[YT Ad Speedup] Skip button detected
-[YT Ad Speedup] Skip button clicked
 [YT Ad Speedup] Restored playback rate to 1x
 [YT Ad Speedup] Ad ended
 ```
+
+### Automatic skipping
+
+1. Close DevTools on the YouTube tab so it does not conflict with the
+   extension's short-lived debugger connection.
+2. Play a video that receives a skippable ad.
+3. Confirm the visible Skip Ad control is activated automatically.
+
+## Permissions
+
+- `storage` is included for persistent extension settings.
+- `debugger` dispatches browser-level mouse input to a validated, visible Skip
+  Ad control. The extension attaches only to the relevant YouTube tab and
+  detaches immediately after sending the click.
 
 ## Reload after a change
 

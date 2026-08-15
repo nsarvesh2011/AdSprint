@@ -6,15 +6,21 @@
   const DEFAULT_AD_SPEED = 4.5;
   const ACTIVE_CHECK_INTERVAL_MS = 400;
   const IDLE_CHECK_INTERVAL_MS = 1500;
+  const SKIP_CLICK_DELAY_MS = 250;
   const SKIP_CLICK_COOLDOWN_MS = 1000;
   const SKIP_CONTROL_RESET_MS = 1500;
+  const MAX_SKIP_CLICK_ATTEMPTS = 2;
+  const SKIP_CLICK_MESSAGE = 'dispatch-skip-click';
   const SKIP_SELECTORS = [
     'button.ytp-ad-skip-button',
     'button.ytp-ad-skip-button-modern',
     'button.ytp-skip-ad-button',
-    '.ytp-ad-skip-button button',
-    '.ytp-ad-skip-button-modern button',
-    '.ytp-skip-ad-button button'
+    '.ytp-ad-skip-button',
+    '.ytp-ad-skip-button-modern',
+    '.ytp-skip-ad-button',
+    '.ytp-ad-skip-button-container',
+    '.ytp-ad-skip-button-slot',
+    'button[id^="skip-button"]'
   ];
   const SKIP_LABELS = new Set(['skip', 'skip ad', 'skip ads']);
 
@@ -22,7 +28,8 @@
   let previousPlaybackRate = 1;
   let lastSkipClick = 0;
   let lastSkipButtonSeenAt = 0;
-  let skipClickLocked = false;
+  let skipClickAttempts = 0;
+  let skipClickTimer = null;
   let observer = null;
   let observedPlayer = null;
   let maintenanceInterval = null;
@@ -101,24 +108,70 @@
     );
   }
 
+  function getInteractiveControl(element) {
+    if (!element) return null;
+
+    if (element.matches('button, [role="button"]')) {
+      return element;
+    }
+
+    return element.querySelector('button, [role="button"]');
+  }
+
   function getSkipButton(player = getPlayerElement()) {
     if (!player) return null;
 
     for (const selector of SKIP_SELECTORS) {
-      for (const button of player.querySelectorAll(selector)) {
-        if (hasReadySkipLabel(button) && isVisibleAndEnabled(button)) {
-          return button;
+      for (const candidate of player.querySelectorAll(selector)) {
+        const control = getInteractiveControl(candidate);
+
+        if (
+          hasReadySkipLabel(control) &&
+          isVisibleAndEnabled(control)
+        ) {
+          return control;
         }
       }
     }
 
-    for (const button of player.querySelectorAll('button')) {
-      if (hasReadySkipLabel(button) && isVisibleAndEnabled(button)) {
-        return button;
+    for (const control of player.querySelectorAll('button, [role="button"]')) {
+      if (hasReadySkipLabel(control) && isVisibleAndEnabled(control)) {
+        return control;
       }
     }
 
     return null;
+  }
+
+  function requestDebuggerClick(button, attemptNumber) {
+    const rect = button.getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+
+    chrome.runtime.sendMessage(
+      {
+        type: SKIP_CLICK_MESSAGE,
+        x,
+        y
+      },
+      (response) => {
+        if (chrome.runtime.lastError) {
+          log(`Skip click failed: ${chrome.runtime.lastError.message}`);
+          return;
+        }
+
+        if (!response?.ok) {
+          log(`Skip click failed: ${response?.error || 'Unknown error'}`);
+          return;
+        }
+
+        log(
+          attemptNumber === 1
+            ? 'Skip button browser click sent'
+            : 'Skip button browser click retry sent'
+        );
+      }
+    );
   }
 
   function trySkipAd() {
@@ -129,10 +182,10 @@
 
     if (!button) {
       if (
-        skipClickLocked &&
+        skipClickAttempts > 0 &&
         now - lastSkipButtonSeenAt >= SKIP_CONTROL_RESET_MS
       ) {
-        skipClickLocked = false;
+        skipClickAttempts = 0;
       }
 
       return;
@@ -141,18 +194,29 @@
     lastSkipButtonSeenAt = now;
 
     if (
-      skipClickLocked ||
+      skipClickTimer ||
+      skipClickAttempts >= MAX_SKIP_CLICK_ATTEMPTS ||
       now - lastSkipClick < SKIP_CLICK_COOLDOWN_MS
     ) {
       return;
     }
 
-    skipClickLocked = true;
-    lastSkipClick = now;
+    skipClickTimer = setTimeout(() => {
+      skipClickTimer = null;
 
-    log('Skip button detected');
-    button.click();
-    log('Skip button clicked');
+      if (!adActive) return;
+
+      const readyButton = getSkipButton();
+
+      if (!readyButton) return;
+
+      lastSkipClick = Date.now();
+      lastSkipButtonSeenAt = lastSkipClick;
+      skipClickAttempts += 1;
+
+      log('Skip button detected');
+      requestDebuggerClick(readyButton, skipClickAttempts);
+    }, SKIP_CLICK_DELAY_MS);
   }
 
   function startAdMode() {
@@ -204,7 +268,12 @@
     previousPlaybackRate = 1;
     lastSkipClick = 0;
     lastSkipButtonSeenAt = 0;
-    skipClickLocked = false;
+    skipClickAttempts = 0;
+
+    if (skipClickTimer) {
+      clearTimeout(skipClickTimer);
+      skipClickTimer = null;
+    }
 
     log('Ad ended');
     startMaintenanceInterval(IDLE_CHECK_INTERVAL_MS);

@@ -4,8 +4,12 @@
   "version": "0.1.0",
   "description": "Speeds up YouTube ads and clicks visible Skip Ad controls.",
   "permissions": [
-    "storage"
+    "storage",
+    "debugger"
   ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "content_scripts": [
     {
       "matches": [
