@@ -1,6 +1,6 @@
 'use strict';
 
-const DEBUG = true;
+const DEBUG = false;
 const PROTOCOL_VERSION = '1.3';
 const SKIP_CLICK_MESSAGE = 'dispatch-skip-click';
 const activeTabClicks = new Set();

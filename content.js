@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const DEBUG = true;
+  const DEBUG = false;
   const MAX_AD_SPEED = 16;
   const DEFAULT_AD_SPEED = 4.5;
   const DEFAULT_SETTINGS = Object.freeze({
