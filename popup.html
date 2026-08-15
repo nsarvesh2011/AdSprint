@@ -8,8 +8,47 @@
   </head>
   <body>
     <main>
-      <h1>YouTube Ad Speedup</h1>
-      <p>Extension scaffold ready.</p>
+      <header class="brand">
+        <img src="icons/icon-48.png" alt="" width="40" height="40">
+        <div>
+          <h1>YouTube Ad Speedup</h1>
+          <p>Faster ads, normal videos untouched.</p>
+        </div>
+      </header>
+
+      <section class="settings" aria-labelledby="settings-heading">
+        <h2 id="settings-heading">Settings</h2>
+
+        <label class="setting-row" for="enabled">
+          <span class="setting-copy">
+            <span class="setting-name">Enabled</span>
+            <span class="setting-description">Speed up and skip visible ads</span>
+          </span>
+          <span class="switch">
+            <input id="enabled" type="checkbox" role="switch">
+            <span class="switch-track" aria-hidden="true"></span>
+          </span>
+        </label>
+
+        <label class="setting-row" for="ad-speed">
+          <span class="setting-copy">
+            <span class="setting-name">Ad speed</span>
+            <span class="setting-description">Maximum 16x</span>
+          </span>
+          <select id="ad-speed" aria-label="Ad playback speed">
+            <option value="2">2x</option>
+            <option value="3">3x</option>
+            <option value="4">4x</option>
+            <option value="4.5">4.5x</option>
+            <option value="10">10x</option>
+            <option value="16">16x</option>
+          </select>
+        </label>
+      </section>
+
+      <p id="status" class="status" role="status" aria-live="polite">
+        Loading settings...
+      </p>
     </main>
     <script src="popup.js"></script>
   </body>

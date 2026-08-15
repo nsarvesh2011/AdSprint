@@ -6,10 +6,13 @@ clicks visible Skip Ad controls.
 ## Features
 
 - Detects when a YouTube ad is playing.
-- Speeds up ads to a maximum of 4.5x.
+- Speeds up ads to a maximum of 16x.
 - Clicks an official Skip Ad button when it becomes visible and enabled.
 - Restores the user's previous playback speed when the ad ends.
 - Continues working when navigating between YouTube videos.
+- Provides an enable toggle and 2x, 3x, 4x, 4.5x, 10x, and 16x ad-speed
+  settings.
+- Applies synced setting changes without reloading YouTube.
 - Does not block or intercept ad requests.
 
 ## Load locally

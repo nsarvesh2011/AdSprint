@@ -2,8 +2,12 @@
   'use strict';
 
   const DEBUG = true;
-  const MAX_AD_SPEED = 4.5;
+  const MAX_AD_SPEED = 16;
   const DEFAULT_AD_SPEED = 4.5;
+  const DEFAULT_SETTINGS = Object.freeze({
+    enabled: true,
+    adSpeed: DEFAULT_AD_SPEED
+  });
   const ACTIVE_CHECK_INTERVAL_MS = 400;
   const IDLE_CHECK_INTERVAL_MS = 1500;
   const SKIP_CLICK_DELAY_MS = 250;
@@ -24,6 +28,7 @@
   ];
   const SKIP_LABELS = new Set(['skip', 'skip ad', 'skip ads']);
 
+  let settings = { ...DEFAULT_SETTINGS };
   let adActive = false;
   let previousPlaybackRate = 1;
   let lastSkipClick = 0;
@@ -51,6 +56,50 @@
     }
 
     return Math.max(1, Math.min(parsed, MAX_AD_SPEED));
+  }
+
+  async function loadSettings() {
+    try {
+      const storedSettings = await chrome.storage.sync.get(DEFAULT_SETTINGS);
+
+      settings = {
+        enabled:
+          typeof storedSettings.enabled === 'boolean'
+            ? storedSettings.enabled
+            : DEFAULT_SETTINGS.enabled,
+        adSpeed: getSafeAdSpeed(storedSettings.adSpeed)
+      };
+    } catch (error) {
+      settings = { ...DEFAULT_SETTINGS };
+      log(`Settings load failed; using defaults: ${error.message}`);
+    }
+  }
+
+  function handleStorageChanges(changes, area) {
+    if (area !== 'sync') return;
+
+    let settingsChanged = false;
+
+    if (changes.enabled) {
+      settings.enabled =
+        typeof changes.enabled.newValue === 'boolean'
+          ? changes.enabled.newValue
+          : DEFAULT_SETTINGS.enabled;
+      settingsChanged = true;
+    }
+
+    if (changes.adSpeed) {
+      settings.adSpeed = getSafeAdSpeed(changes.adSpeed.newValue);
+      settingsChanged = true;
+    }
+
+    if (!settingsChanged) return;
+
+    log(
+      `Settings updated: ${settings.enabled ? 'enabled' : 'disabled'}, ` +
+        `${settings.adSpeed}x`
+    );
+    checkPlayerState();
   }
 
   function getPlayerElement() {
@@ -97,6 +146,8 @@
   }
 
   function hasReadySkipLabel(button) {
+    if (!button) return false;
+
     const labels = [
       button.getAttribute('aria-label'),
       button.getAttribute('title'),
@@ -229,7 +280,7 @@
     previousPlaybackRate = video.playbackRate || 1;
     adActive = true;
 
-    const speed = getSafeAdSpeed(DEFAULT_AD_SPEED);
+    const speed = getSafeAdSpeed(settings.adSpeed);
     video.playbackRate = speed;
 
     log('Ad detected');
@@ -244,7 +295,7 @@
 
     if (!video) return;
 
-    const targetSpeed = getSafeAdSpeed(DEFAULT_AD_SPEED);
+    const targetSpeed = getSafeAdSpeed(settings.adSpeed);
 
     if (video.playbackRate !== targetSpeed) {
       video.playbackRate = targetSpeed;
@@ -323,6 +374,11 @@
       setupObserver(player);
     }
 
+    if (!settings.enabled) {
+      endAdMode();
+      return;
+    }
+
     if (isAdPlaying(player)) {
       startAdMode();
       maintainAdMode();
@@ -358,13 +414,15 @@
     checkPlayerState();
   }
 
-  function init() {
+  async function init() {
     if (initialized) return;
 
     initialized = true;
+    await loadSettings();
     setupObserver();
     startMaintenanceInterval(IDLE_CHECK_INTERVAL_MS);
     document.addEventListener('yt-navigate-finish', handleYouTubeNavigation);
+    chrome.storage.onChanged.addListener(handleStorageChanges);
     checkPlayerState();
 
     log('Initialized');
